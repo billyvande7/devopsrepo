@@ -1,0 +1,203 @@
+name: CI/CD Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semantic Version (e.g., v1.2.3)'
+        required: true
+        type: string
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: docker.io
+  AUTH_IMAGE: billyvande7/auth-service
+  SHORTENER_IMAGE: billyvande7/shortener-service
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: auth-service
+            path: auth-service
+            type: go
+            test_cmd: go test ./...
+          - name: shortener-service
+            path: shortener-service
+            type: node
+            test_cmd: npm ci && npm run test
+    name: Unit Test - ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        if: matrix.type == 'go'
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21
+          cache: true
+      - name: Set up Node.js
+        if: matrix.type == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+      - name: Run unit tests
+        working-directory: ${{ matrix.path }}
+        run: ${{ matrix.test_cmd }}
+        continue-on-error: false
+
+  build-apps:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: auth-service
+            path: auth-service
+            type: go
+          - name: shortener-service
+            path: shortener-service
+            type: node
+    name: Build - ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        if: matrix.type == 'go'
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21
+          cache: true
+      - name: Build Go service
+        if: matrix.type == 'go'
+        run: |
+          cd ${{ matrix.path }}
+          CGO_ENABLED=0 GOOS=linux go build -o app
+      - name: Set up Node.js
+        if: matrix.type == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+      - name: Build Node.js service
+        if: matrix.type == 'node'
+        run: |
+          cd ${{ matrix.path }}
+          npm ci
+          npm run build
+
+  docker:
+    needs: build-apps
+    runs-on: ubuntu-latest
+    # Skip on pull requests
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.AUTH_IMAGE }}
+            ${{ env.REGISTRY }}/${{ env.SHORTENER_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=ref,event=branch
+            type=ref,event=tag
+
+      - name: Build and Push Auth Service Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./auth-service
+          file: ./auth-service/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.AUTH_IMAGE }}:${{ inputs.version }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.AUTH_IMAGE }}:latest
+          cache-to: type=inline
+          platforms: linux/amd64,linux/arm64
+
+      - name: Build and Push Shortener Service Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./shortener-service
+          file: ./shortener-service/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.SHORTENER_IMAGE }}:${{ inputs.version }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.SHORTENER_IMAGE }}:latest
+          cache-to: type=inline
+          platforms: linux/amd64,linux/arm64
+
+  update-manifest:
+    needs: docker
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Update Kubernetes Manifests
+        run: |
+          if [ ! -f manifests/auth-service/deployment.yaml ] || [ ! -f manifests/shortener-service/deployment.yaml ]; then
+            echo "Error: Manifest files not found"
+            exit 1
+          fi
+          
+          sed -i "s|image: .*auth-service.*|image: $REGISTRY/$AUTH_IMAGE:${{ inputs.version }}|" manifests/auth-service/deployment.yaml
+          sed -i "s|image: .*shortener-service.*|image: $REGISTRY/$SHORTENER_IMAGE:${{ inputs.version }}|" manifests/shortener-service/deployment.yaml
+          sed -i "s|app.kubernetes.io/version: \".*\"|app.kubernetes.io/version: \"${{ inputs.version }}\"|" manifests/auth-service/deployment.yaml
+          sed -i "s|app.kubernetes.io/version: \".*\"|app.kubernetes.io/version: \"${{ inputs.version }}\"|" manifests/shortener-service/deployment.yaml
+      
+      - name: Verify Changes
+        run: |
+          if ! git diff --exit-code manifests/; then
+            echo "Manifests updated successfully"
+          else
+            echo "No changes made to manifests"
+            exit 1
+          fi
+      
+      - name: Commit updated manifests
+        run: |
+          git config user.name "billyvande7"
+          git config user.email "billyvande7@gmail.com"
+          git commit -am "chore: update manifests to ${{ inputs.version }}"
+          git push
+        continue-on-error: false
+
+  argocd-sync:
+    needs: update-manifest
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Trigger ArgoCD Sync for Auth Service
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+            ${{ secrets.ARGOCD_SERVER }}/api/v1/applications/auth-service/sync \
+            --fail
+      
+      - name: Trigger ArgoCD Sync for Shortener Service
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+            ${{ secrets.ARGOCD_SERVER }}/api/v1/applications/shortener-service/sync \
+            --fail

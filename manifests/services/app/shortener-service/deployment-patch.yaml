@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  template:
+    spec:
+      serviceAccountName: shortener-service
+      containers:
+      - name: app
+        securityContext:
+          runAsUser: 0
+        # PATCH THE RESOURCES
+        # resources:
+        #   requests:
+        #     memory: "128Mi"
+        #     cpu: "100m"
+        #   limits:
+        #     memory: "256Mi"
+        #     cpu: "200m"
+        readinessProbe:
+          httpGet: 
+            path: /health
+        livenessProbe:
+          httpGet: 
+            path: /health
+        envFrom:
+        - configMapRef:
+            name: shortener-service-configmap
+        - secretRef:
+            name: shortener-service-secret

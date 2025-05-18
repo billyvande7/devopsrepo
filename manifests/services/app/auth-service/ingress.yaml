@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: auth-service
+  name: auth-service-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    kubernetes.io/ingress.global-static-ip-name: nginx-ingress
+spec:
+  ingressClassName: ingress-gateway
+  tls:
+    - hosts:
+      - test.zhuxin.my.id
+      secretName: auth-service-tls

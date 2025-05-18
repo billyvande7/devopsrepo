@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cfx_frontend
+    ports:
+      - "8082:80"
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+      - NODE_ENV=${NODE_ENV:-development}
+    networks:
+      - cfx_network
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./dist:/usr/share/nginx/html:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  cfx_network:
+    external: true 

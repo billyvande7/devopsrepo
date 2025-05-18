@@ -1,0 +1,9 @@
+---
+namespace: loki
+helmCharts:
+  - name: loki
+    version: 6.29.0
+    repo: https://grafana.github.io/helm-charts
+    valuesFile: values.yaml
+    namespace: loki
+    releaseName: loki

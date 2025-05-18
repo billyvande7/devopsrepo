@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sampleapp-ingress  # Lowercase and hyphens only
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: sampleapp-ip  # Also lowercase
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    acme.cert-manager.io/http01-edit-in-place: "true"
+  labels:
+    app: sampleapp  # Lowercase label
+spec:
+  tls:
+  - hosts:
+    - example.example.com  # Host remains unchanged (DNS rules differ)
+    secretName: sampleapp-cert-secret  # Lowercase
+  rules:
+  - host: example.example.com
+    http:
+      paths:
+      - path: /sample/app/path/*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: sampleapp-service  # Lowercase
+            port: 
+              number: 8080

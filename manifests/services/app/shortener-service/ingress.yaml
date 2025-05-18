@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: shortener-service
+  name: shortener-service-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    kubernetes.io/ingress.global-static-ip-name: nginx-ingress
+spec:
+  ingressClassName: ingress-gateway
+  tls:
+    - hosts:
+      - test.zhuxin.my.id
+      secretName: shortener-service-tls
+  rules:
+    - host: test.zhuxin.my.id
+      http:
+        paths:
+          - path: /api/login/
+            pathType: Prefix
+            backend:
+              service:
+                name: shortener-service
+                port:
+                  number: 3000
+          - path: /api/shorten/
+            pathType: Prefix
+            backend:
+              service:
+                name: shortener-service
+                port:
+                  number: 3000

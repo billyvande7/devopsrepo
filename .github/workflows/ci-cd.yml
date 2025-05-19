@@ -172,7 +172,6 @@ jobs:
             echo "Manifests updated successfully"
           else
             echo "No changes made to manifests"
-            exit 1
           fi
       
       - name: Commit updated manifests

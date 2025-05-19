@@ -183,21 +183,21 @@ jobs:
           git push
         continue-on-error: false
 
-  argocd-sync:
-    needs: update-manifest
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
-    steps:
-      - name: Trigger ArgoCD Sync for Auth Service
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
-            ${{ secrets.ARGOCD_SERVER }}/api/v1/applications/auth-service/sync \
-            --fail
+  # argocd-sync:
+  #   needs: update-manifest
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name != 'pull_request'
+  #   steps:
+  #     - name: Trigger ArgoCD Sync for Auth Service
+  #       run: |
+  #         curl -X POST \
+  #           -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+  #           ${{ secrets.ARGOCD_SERVER }}/api/v1/applications/auth-service/sync \
+  #           --fail
       
-      - name: Trigger ArgoCD Sync for Shortener Service
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
-            ${{ secrets.ARGOCD_SERVER }}/api/v1/applications/shortener-service/sync \
-            --fail
+  #     - name: Trigger ArgoCD Sync for Shortener Service
+  #       run: |
+  #         curl -X POST \
+  #           -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+  #           ${{ secrets.ARGOCD_SERVER }}/api/v1/applications/shortener-service/sync \
+  #           --fail

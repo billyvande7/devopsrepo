@@ -156,15 +156,15 @@ jobs:
           
       - name: Update Kubernetes Manifests
         run: |
-          if [ ! -f manifests/auth-service/deployment.yaml ] || [ ! -f manifests/shortener-service/deployment.yaml ]; then
+          if [ ! -f standard-manifests/app/auth-service.yaml ] || [ ! -f standard-manifests/app/shortener-service.yaml ]; then
             echo "Error: Manifest files not found"
             exit 1
           fi
           
-          sed -i "s|image: .*auth-service.*|image: $REGISTRY/$AUTH_IMAGE:${{ inputs.version }}|" manifests/auth-service/deployment.yaml
-          sed -i "s|image: .*shortener-service.*|image: $REGISTRY/$SHORTENER_IMAGE:${{ inputs.version }}|" manifests/shortener-service/deployment.yaml
-          sed -i "s|app.kubernetes.io/version: \".*\"|app.kubernetes.io/version: \"${{ inputs.version }}\"|" manifests/auth-service/deployment.yaml
-          sed -i "s|app.kubernetes.io/version: \".*\"|app.kubernetes.io/version: \"${{ inputs.version }}\"|" manifests/shortener-service/deployment.yaml
+          sed -i "s|image: .*auth-service.*|image: $REGISTRY/$AUTH_IMAGE:${{ inputs.version }}|" standard-manifests/app/auth-service.yaml
+          sed -i "s|image: .*shortener-service.*|image: $REGISTRY/$SHORTENER_IMAGE:${{ inputs.version }}|" standard-manifests/app/shortener-service.yaml
+          sed -i "s|app.kubernetes.io/version: \".*\"|app.kubernetes.io/version: \"${{ inputs.version }}\"|" standard-manifests/app/auth-service.yaml
+          sed -i "s|app.kubernetes.io/version: \".*\"|app.kubernetes.io/version: \"${{ inputs.version }}\"|" standard-manifests/app/shortener-service.yaml
       
       - name: Verify Changes
         run: |
@@ -179,7 +179,7 @@ jobs:
         run: |
           git config user.name "billyvande7"
           git config user.email "billyvande7@gmail.com"
-          git commit -am "chore: update manifests to ${{ inputs.version }}"
+          git commit -am "[CHORE] Update manifests to ${{ inputs.version }}"
           git push
         continue-on-error: false
 

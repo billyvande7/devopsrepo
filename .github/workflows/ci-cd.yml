@@ -129,7 +129,7 @@ jobs:
           context: ./auth-service
           file: ./auth-service/Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.AUTH_IMAGE }}:${{ inputs.version }}
+          tags: ${{ env.REGISTRY }}/${{ env.AUTH_IMAGE }}:${{ github.event.inputs.version || github.ref_name }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.AUTH_IMAGE }}:latest
           cache-to: type=inline
           platforms: linux/amd64,linux/arm64
@@ -140,7 +140,7 @@ jobs:
           context: ./shortener-service
           file: ./shortener-service/Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.SHORTENER_IMAGE }}:${{ inputs.version }}
+          tags: ${{ env.REGISTRY }}/${{ env.SHORTENER_IMAGE }}:${{ github.event.inputs.version || github.ref_name }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.SHORTENER_IMAGE }}:latest
           cache-to: type=inline
           platforms: linux/amd64,linux/arm64

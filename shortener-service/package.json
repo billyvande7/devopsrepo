@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"No tests yet\" && exit 0",
-    "start": "node index.js"
+    "start": "node index.js",
+    "build": "echo 'build script executed'" 
   },
   "private": true,
   "dependencies": {
